@@ -1,0 +1,14 @@
+{
+  "name": "keycat-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Builds the shipped web assets (web/dist) for KeyCat",
+  "scripts": {
+    "build:web": "node tools/build-web.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "three": "0.128.0"
+  }
+}
