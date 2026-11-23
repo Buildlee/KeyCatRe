@@ -6,6 +6,8 @@
   const { V } = K;
   const U = 0.15;          // one key unit in world space
   const CAP = 0.129;       // keycap footprint for a 1u key
+  // The board follows the host the page runs on: WebView2 says Windows, WKWebView says Mac.
+  const WINDOWS = !/Mac OS X|Macintosh/i.test(navigator.userAgent);
   const ROWS = [
     [['Escape', 1, 'esc', 'orange'], ['Digit1', 1, '1'], ['Digit2', 1, '2'], ['Digit3', 1, '3'], ['Digit4', 1, '4'],
      ['Digit5', 1, '5'], ['Digit6', 1, '6'], ['Digit7', 1, '7'], ['Digit8', 1, '8'], ['Digit9', 1, '9'],
@@ -19,15 +21,31 @@
     [['ShiftLeft', 2.25, '⇧', 'mod'], ['KeyZ', 1, 'Z'], ['KeyX', 1, 'X'], ['KeyC', 1, 'C'], ['KeyV', 1, 'V'],
      ['KeyB', 1, 'B'], ['KeyN', 1, 'N'], ['KeyM', 1, 'M'], ['Comma', 1, ','], ['Period', 1, '.'],
      ['Slash', 1, '/'], ['ShiftRight', 1.75, '⇧', 'mod'], ['ArrowUp', 1, '↑', 'mod']],
-    [['ControlLeft', 1.25, '⌃', 'mod'], ['AltLeft', 1.25, '⌥', 'mod'], ['MetaLeft', 1.25, '⌘', 'mod'],
-     ['Space', 6.25, 'space'], ['MetaRight', 1, '⌘', 'mod'], ['ArrowLeft', 1, '←', 'mod'],
-     ['ArrowDown', 1, '↓', 'mod'], ['ArrowRight', 1, '→', 'mod']],
   ];
-  // Aliases for keys this board has no cap for.
+  // The bottom row is the one place the two platforms disagree, and only by name: Windows reads
+  // Ctrl | Win | Alt … Alt where the Mac board has ⌃ ⌥ ⌘ … ⌘. Same widths, so the caps keep their
+  // places, and the Windows right Alt gets a cap of its own instead of borrowing the second ⌘.
+  ROWS.push(WINDOWS
+    ? [['ControlLeft', 1.25, 'Ctrl', 'mod'], ['MetaLeft', 1.25, 'Win', 'mod'], ['AltLeft', 1.25, 'Alt', 'mod'],
+       ['Space', 6.25, 'space'], ['AltRight', 1, 'Alt', 'mod'], ['ArrowLeft', 1, '←', 'mod'],
+       ['ArrowDown', 1, '↓', 'mod'], ['ArrowRight', 1, '→', 'mod']]
+    : [['ControlLeft', 1.25, '⌃', 'mod'], ['AltLeft', 1.25, '⌥', 'mod'], ['MetaLeft', 1.25, '⌘', 'mod'],
+       ['Space', 6.25, 'space'], ['MetaRight', 1, '⌘', 'mod'], ['ArrowLeft', 1, '←', 'mod'],
+       ['ArrowDown', 1, '↓', 'mod'], ['ArrowRight', 1, '→', 'mod']]);
+  // Aliases for keys this board has no cap for. On Windows the right Ctrl and the right Win land on
+  // the cap of the same modifier; the Mac board has no such caps, so there they press its second ⌘.
   const ALIAS = {
-    Backquote: 'Escape', Delete: 'Backspace', Fn: 'ControlLeft', ControlRight: 'MetaRight',
-    AltRight: 'MetaRight', IntlBackslash: 'ShiftLeft', NumpadEnter: 'Enter', ContextMenu: 'MetaRight',
+    Backquote: 'Escape', Delete: 'Backspace', Fn: 'ControlLeft', IntlBackslash: 'ShiftLeft',
+    NumpadEnter: 'Enter',
   };
+  if (WINDOWS) {
+    ALIAS.ControlRight = 'ControlLeft';
+    ALIAS.MetaRight = 'MetaLeft';
+  } else {
+    ALIAS.ControlRight = 'MetaRight';
+    ALIAS.AltRight = 'MetaRight';
+    ALIAS.ContextMenu = 'MetaRight';
+  }
   for (let i = 1; i <= 12; i++) ALIAS['F' + i] = 'Digit' + (i === 10 ? 0 : i === 11 ? 'Minus' : i === 12 ? 'Equal' : i);
   ALIAS.F11 = 'Minus'; ALIAS.F12 = 'Equal';
   for (let i = 0; i <= 9; i++) ALIAS['Numpad' + i] = 'Digit' + i;
