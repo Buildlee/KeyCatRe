@@ -1,8 +1,9 @@
 name: Windows
 
-# Builds the Tauri shell in win/ on a real Windows runner. Tag pushes also publish the installer
-# plus latest.json, which is what the app's updater reads, and latest.yml, which moves 1.0.x
-# installs (Electron, electron-updater) over to this build.
+# Builds the Tauri shell in win/ on a real Windows runner. KeyCat is updated by hand from the
+# release page: win/ has no updater plugin and the bundle is not signed, so nothing here signs
+# artefacts or writes latest.json / latest.yml either. Those two manifests are what the 1.0.x
+# Electron build polled, and not publishing them is what keeps it from updating itself.
 on:
   push:
     branches: [main]
@@ -47,21 +48,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The updater key only exists as a repository secret; without it (pull requests from
-      # forks) the installer is built unsigned, which is fine for checking that it builds.
+      # No TAURI_SIGNING_*: without the updater plugin and without createUpdaterArtifacts there is
+      # nothing to sign, so a pull request, a push to main and a tag all run the same command.
       - name: Build installer
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run dist
+
+      # The updater is gone, so a signature or a manifest in the bundle means a dependency came back.
+      - name: Check that nothing updater-shaped was built
         run: |
-          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            npm run dist
-          else
-            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-              echo "TAURI_SIGNING_PRIVATE_KEY is required to publish a release" >&2
-              exit 1
-            fi
-            npm run dist -- --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          found="$(ls target/release/bundle/nsis/*.sig target/release/bundle/nsis/latest* 2>/dev/null || true)"
+          if [ -n "$found" ]; then
+            echo "unexpected updater artefacts in the bundle:" >&2
+            echo "$found" >&2
+            exit 1
           fi
 
       - name: Collect release files
@@ -70,35 +69,8 @@ jobs:
           mkdir -p out
           cp target/release/bundle/nsis/KeyCat_"$version"_x64-setup.exe out/KeyCat-Windows-Setup.exe
           ls -l out
-          [ -f target/release/bundle/nsis/KeyCat_"$version"_x64-setup.exe.sig ] || exit 0
-          url="https://github.com/ElloboDK/KeyCat/releases/download/v$version/KeyCat-Windows-Setup.exe"
-          date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          VERSION="$version" URL="$url" DATE="$date" \
-          SIG="$(cat target/release/bundle/nsis/KeyCat_"$version"_x64-setup.exe.sig)" \
-          node -e '
-            const fs = require("fs");
-            const { VERSION, URL, DATE, SIG } = process.env;
-            fs.writeFileSync("out/latest.json", JSON.stringify({
-              version: VERSION,
-              pub_date: DATE,
-              platforms: { "windows-x86_64": { signature: SIG, url: URL } },
-            }, null, 2));
-            const exe = fs.readFileSync("out/KeyCat-Windows-Setup.exe");
-            const sha512 = require("crypto").createHash("sha512").update(exe).digest("base64");
-            fs.writeFileSync("out/latest.yml", [
-              `version: ${VERSION}`,
-              "files:",
-              "  - url: KeyCat-Windows-Setup.exe",
-              `    sha512: ${sha512}`,
-              `    size: ${exe.length}`,
-              "path: KeyCat-Windows-Setup.exe",
-              `sha512: ${sha512}`,
-              `releaseDate: '\''${DATE}'\''`,
-              "",
-            ].join("\n"));
-          '
-          cat out/latest.json out/latest.yml
 
+      # One asset, no manifests: the release page is the whole update story for KeyCat.
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
@@ -106,7 +78,7 @@ jobs:
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
             || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
-          gh release upload "$GITHUB_REF_NAME" out/KeyCat-Windows-Setup.exe out/latest.json out/latest.yml --clobber
+          gh release upload "$GITHUB_REF_NAME" out/KeyCat-Windows-Setup.exe --clobber
 
       - uses: actions/upload-artifact@v4
         with:
