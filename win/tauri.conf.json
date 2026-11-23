@@ -5,7 +5,7 @@
   "version": "./package.json",
   "identifier": "com.ellobok.keycat",
   "build": {
-    "frontendDist": "../web"
+    "frontendDist": "../web/dist"
   },
   "app": {
     "windows": [],
