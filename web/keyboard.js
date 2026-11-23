@@ -6,53 +6,66 @@
   const { V } = K;
   const U = 0.15;          // one key unit in world space
   const CAP = 0.129;       // keycap footprint for a 1u key
-  // The board follows the host the page runs on: WebView2 says Windows, WKWebView says Mac.
+  // The board follows the host it runs on: WebView2 says Windows, WKWebView says Mac. The names below
+  // are what the popup calls a key, spelled the way that platform's keyboard prints it: a Mac has
+  // ⌫ ⇥ ⇪ ⇧ ⏎, a Windows board reads Esc / Bksp / Del / Tab / Caps / Shift / Enter and Ctrl / Win / Alt.
   const WINDOWS = !/Mac OS X|Macintosh/i.test(navigator.userAgent);
+  const L = WINDOWS
+    ? { esc: 'Esc', grave: '`', bksp: 'Bksp', del: 'Del', tab: 'Tab', caps: 'Caps', shift: 'Shift', enter: 'Enter' }
+    : { esc: 'esc', bksp: '⌫', tab: '⇥', caps: '⇪', shift: '⇧', enter: '⏎' };
+  // The two places the layouts differ in shape: the Mac board puts esc in the top-left corner and one
+  // wide ⌫ at the end of the number row, where a Windows board has ` in the corner and splits that
+  // 2u into Bksp + Del, the way 65% boards sit those two side by side.
+  const CORNER = WINDOWS ? ['Backquote', 1, L.grave, 'orange'] : ['Escape', 1, L.esc, 'orange'];
+  const EDGE = WINDOWS
+    ? [['Backspace', 1, L.bksp, 'mod'], ['Delete', 1, L.del, 'mod']]
+    : [['Backspace', 2, L.bksp, 'mod']];
   const ROWS = [
-    [['Escape', 1, 'esc', 'orange'], ['Digit1', 1, '1'], ['Digit2', 1, '2'], ['Digit3', 1, '3'], ['Digit4', 1, '4'],
+    [CORNER, ['Digit1', 1, '1'], ['Digit2', 1, '2'], ['Digit3', 1, '3'], ['Digit4', 1, '4'],
      ['Digit5', 1, '5'], ['Digit6', 1, '6'], ['Digit7', 1, '7'], ['Digit8', 1, '8'], ['Digit9', 1, '9'],
-     ['Digit0', 1, '0'], ['Minus', 1, '-'], ['Equal', 1, '='], ['Backspace', 2, '⌫', 'mod']],
-    [['Tab', 1.5, '⇥', 'mod'], ['KeyQ', 1, 'Q'], ['KeyW', 1, 'W'], ['KeyE', 1, 'E'], ['KeyR', 1, 'R'], ['KeyT', 1, 'T'],
+     ['Digit0', 1, '0'], ['Minus', 1, '-'], ['Equal', 1, '='], ...EDGE],
+    [['Tab', 1.5, L.tab, 'mod'], ['KeyQ', 1, 'Q'], ['KeyW', 1, 'W'], ['KeyE', 1, 'E'], ['KeyR', 1, 'R'], ['KeyT', 1, 'T'],
      ['KeyY', 1, 'Y'], ['KeyU', 1, 'U'], ['KeyI', 1, 'I'], ['KeyO', 1, 'O'], ['KeyP', 1, 'P'],
      ['BracketLeft', 1, '['], ['BracketRight', 1, ']'], ['Backslash', 1.5, '\\', 'mod']],
-    [['CapsLock', 1.75, '⇪', 'mod'], ['KeyA', 1, 'A'], ['KeyS', 1, 'S'], ['KeyD', 1, 'D'], ['KeyF', 1, 'F'],
+    [['CapsLock', 1.75, L.caps, 'mod'], ['KeyA', 1, 'A'], ['KeyS', 1, 'S'], ['KeyD', 1, 'D'], ['KeyF', 1, 'F'],
      ['KeyG', 1, 'G'], ['KeyH', 1, 'H'], ['KeyJ', 1, 'J'], ['KeyK', 1, 'K'], ['KeyL', 1, 'L'],
-     ['Semicolon', 1, ';'], ['Quote', 1, "'"], ['Enter', 2.25, '⏎', 'orange']],
-    [['ShiftLeft', 2.25, '⇧', 'mod'], ['KeyZ', 1, 'Z'], ['KeyX', 1, 'X'], ['KeyC', 1, 'C'], ['KeyV', 1, 'V'],
+     ['Semicolon', 1, ';'], ['Quote', 1, "'"], ['Enter', 2.25, L.enter, 'orange']],
+    [['ShiftLeft', 2.25, L.shift, 'mod'], ['KeyZ', 1, 'Z'], ['KeyX', 1, 'X'], ['KeyC', 1, 'C'], ['KeyV', 1, 'V'],
      ['KeyB', 1, 'B'], ['KeyN', 1, 'N'], ['KeyM', 1, 'M'], ['Comma', 1, ','], ['Period', 1, '.'],
-     ['Slash', 1, '/'], ['ShiftRight', 1.75, '⇧', 'mod'], ['ArrowUp', 1, '↑', 'mod']],
+     ['Slash', 1, '/'], ['ShiftRight', 1.75, L.shift, 'mod'], ['ArrowUp', 1, '↑', 'mod']],
   ];
-  // The bottom row is the one place the two platforms disagree, and only by name: Windows reads
-  // Ctrl | Win | Alt … Alt where the Mac board has ⌃ ⌥ ⌘ … ⌘. Same widths, so the caps keep their
-  // places, and the Windows right Alt gets a cap of its own instead of borrowing the second ⌘.
+  // The bottom row is where the two part company, and the one row whose width differs: the Windows
+  // row is a full 15 units (Ctrl | Win | Alt | space | Alt | Menu, the right Alt on a cap of its own)
+  // while the Mac row keeps ⌃ ⌥ ⌘ … ⌘ and ends one unit short, exactly as it always has.
   ROWS.push(WINDOWS
     ? [['ControlLeft', 1.25, 'Ctrl', 'mod'], ['MetaLeft', 1.25, 'Win', 'mod'], ['AltLeft', 1.25, 'Alt', 'mod'],
-       ['Space', 6.25, 'space'], ['AltRight', 1, 'Alt', 'mod'], ['ArrowLeft', 1, '←', 'mod'],
-       ['ArrowDown', 1, '↓', 'mod'], ['ArrowRight', 1, '→', 'mod']]
+       ['Space', 5.75, 'space'], ['AltRight', 1.25, 'Alt', 'mod'], ['ContextMenu', 1.25, 'Menu', 'mod'],
+       ['ArrowLeft', 1, '←', 'mod'], ['ArrowDown', 1, '↓', 'mod'], ['ArrowRight', 1, '→', 'mod']]
     : [['ControlLeft', 1.25, '⌃', 'mod'], ['AltLeft', 1.25, '⌥', 'mod'], ['MetaLeft', 1.25, '⌘', 'mod'],
        ['Space', 6.25, 'space'], ['MetaRight', 1, '⌘', 'mod'], ['ArrowLeft', 1, '←', 'mod'],
        ['ArrowDown', 1, '↓', 'mod'], ['ArrowRight', 1, '→', 'mod']]);
-  // Aliases for keys this board has no cap for. On Windows the right Ctrl and the right Win land on
-  // the cap of the same modifier; the Mac board has no such caps, so there they press its second ⌘.
-  const ALIAS = {
-    Backquote: 'Escape', Delete: 'Backspace', Fn: 'ControlLeft', IntlBackslash: 'ShiftLeft',
-    NumpadEnter: 'Enter',
-  };
+  // Aliases for keys this board has no cap for. Windows keeps ` where the Mac board has esc, so there
+  // Escape lights that cap; on the Mac, Delete still presses ⌫ and the right-hand modifiers press its
+  // second ⌘. Either way the right Win and the right Ctrl land on the left cap of the same modifier.
+  const ALIAS = { Fn: 'ControlLeft', IntlBackslash: 'ShiftLeft', NumpadEnter: 'Enter' };
   if (WINDOWS) {
+    ALIAS.Escape = 'Backquote';
     ALIAS.ControlRight = 'ControlLeft';
     ALIAS.MetaRight = 'MetaLeft';
   } else {
-    ALIAS.ControlRight = 'MetaRight';
-    ALIAS.AltRight = 'MetaRight';
-    ALIAS.ContextMenu = 'MetaRight';
+    Object.assign(ALIAS, {
+      Backquote: 'Escape', Delete: 'Backspace', ControlRight: 'MetaRight', AltRight: 'MetaRight',
+      ContextMenu: 'MetaRight',
+    });
   }
   for (let i = 1; i <= 12; i++) ALIAS['F' + i] = 'Digit' + (i === 10 ? 0 : i === 11 ? 'Minus' : i === 12 ? 'Equal' : i);
   ALIAS.F11 = 'Minus'; ALIAS.F12 = 'Equal';
   for (let i = 0; i <= 9; i++) ALIAS['Numpad' + i] = 'Digit' + i;
   Object.assign(ALIAS, { NumpadAdd: 'Equal', NumpadSubtract: 'Minus', NumpadMultiply: 'Digit8', NumpadDivide: 'Slash', NumpadDecimal: 'Period', NumpadEqual: 'Equal' });
-
+  // What the popup calls a key the board has no cap for: the name printed on the user's keyboard.
+  const PRESS_NAME = { Escape: 'Esc', Backquote: '`', Delete: 'Del', ContextMenu: 'Menu', IntlBackslash: '\\', Fn: 'Fn' };
   // Keys the user types with the left hand; the cat presses them with the paw on screen right.
-  const LEFT_HAND = new Set(['Escape', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Tab', 'KeyQ', 'KeyW', 'KeyE',
+  const LEFT_HAND = new Set(['Escape', 'Backquote', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Tab', 'KeyQ', 'KeyW', 'KeyE',
     'KeyR', 'KeyT', 'CapsLock', 'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'ShiftLeft', 'KeyZ', 'KeyX', 'KeyC', 'KeyV',
     'KeyB', 'ControlLeft', 'AltLeft', 'MetaLeft']);
 
@@ -121,6 +134,8 @@
     releaseAll() { for (const key of keys.values()) key.down = false; },
     hitMeshes: [caseMesh, plate],
     resolve(code) { return keys.get(code) || keys.get(ALIAS[code]) || null; },
+    // The popup name for a press: the cap's own label, or the name of a key that has no cap.
+    labelFor(code, key) { return key.code === code ? key.label : (PRESS_NAME[code] || key.label); },
     leftHand: code => LEFT_HAND.has(ALIAS[code] || code),
     // World-space top centre of a key, including how far it is pushed in.
     keyTop(key, out = world) {

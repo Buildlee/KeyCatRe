@@ -120,7 +120,7 @@
     // Modifier taps (caps lock / fn) send no key-up; let them spring back.
     if (code === 'CapsLock') setTimeout(() => key(code, false), 120);
     // F keys have no caps of their own and press the digit below; the label still names the F key.
-    if (!opts.privacy) popup(k, t, paw.side, /^F\d+$/.test(code) ? code : k.label);
+    if (!opts.privacy) popup(k, t, paw.side, /^F\d+$/.test(code) ? code : keyboard.labelFor(code, k));
   }
 
   const fxSprite = (kind, order) => {
