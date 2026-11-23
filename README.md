@@ -4,6 +4,12 @@
 
 ![KeyCat](docs/screenshots/curious.jpg)
 
+## 下载
+
+**Windows**：[下载 KeyCat-Windows-Setup.exe](https://github.com/Buildlee/KeyCatRe/releases/latest/download/KeyCat-Windows-Setup.exe)
+
+双击安装就能用，不需要额外装运行时（界面由系统自带的 WebView2 绘制），装完在托盘里出现一只猫。装好会注册卸载项，卸载走安装目录里的 `uninstall.exe`，或者「设置 → 应用」。
+
 ## 安装
 
 **macOS**：在终端执行
@@ -15,7 +21,7 @@ curl -L -o /tmp/KeyCat-macOS.zip https://github.com/ElloboDK/KeyCat/releases/lat
 
 首次启动需在「系统设置 → 隐私与安全性 → 输入监控」里允许 KeyCat，然后重启应用。它只读取哪个键被按下，不记录输入内容。手动从浏览器下载时，若提示「已损坏」，执行 `xattr -dr com.apple.quarantine /Applications/KeyCat.app`。
 
-**Windows**：从 [Releases](https://github.com/ElloboDK/KeyCat/releases/latest) 下载 `KeyCat-Windows-Setup.exe` 运行。SmartScreen 拦截时点「更多信息 → 仍要运行」。安装包只有几 MB，猫由系统自带的 WebView2 绘制，极少数没装 WebView2 的 Win10 会在安装时自动下载。默认装到 `D:\Program\KeyCat`，没有 D 盘时退到 `%LOCALAPPDATA%\KeyCat`，安装向导里也能自己改目录。应用不会自动更新：有新版本时到 Releases 页手动下载安装即可，设置会保留。
+**Windows**：从 [Releases](https://github.com/Buildlee/KeyCatRe/releases/latest) 下载 `KeyCat-Windows-Setup.exe` 运行。SmartScreen 拦截时点「更多信息 → 仍要运行」。安装包只有几 MB，猫由系统自带的 WebView2 绘制，极少数没装 WebView2 的 Win10 会在安装时自动下载。默认装到 `D:\Program\KeyCat`，没有 D 盘时退到 `%LOCALAPPDATA%\KeyCat`，安装向导里也能自己改目录。应用不会自动更新：有新版本时到 Releases 页手动下载安装即可，设置会保留。
 
 ## 使用
 
@@ -39,11 +45,11 @@ mac 版用 `signing/` 里自动生成的本地证书签名，这样重新编译�
 
 ## 发布
 
-mac 和 Windows 共用一个 Release，两边产物都要上传，否则另一端的下载链接或自动更新会失效。
+本仓库的 Release 只发布 Windows 安装包：macOS 产物需要在 Mac 上用 Xcode 打包，仍走上游仓库。
 
 1. 把 `win/package.json` 的 `version` 和 `mac/Info.plist` 的 `CFBundleShortVersionString` 改成同一个版本，`CFBundleVersion` 加 1，合入 main。
-2. 执行 `sh mac/package.sh`，推送 `vX.Y.Z` tag，再执行 `gh release create vX.Y.Z --generate-notes dist/KeyCat-macOS.zip dist/KeyCat-macOS.zip.sha256`。
-3. tag 触发 GitHub Actions，几分钟后会把 Windows 安装包补传到同一个 Release。应用没有自动更新，用户手动来下载。
+2. 推送 `vX.Y.Z` tag，GitHub Actions 会构建安装包并自动建 Release、上传 `KeyCat-Windows-Setup.exe`。
+3. 整个过程不需要任何签名密钥，也不生成 `latest.json` / `latest.yml`：应用没有 updater，用户手动来下载。
 
 ## 目录
 
