@@ -1,7 +1,8 @@
 // The Windows host for the web scene in ../web. Mirrors the mac build's mac/App.swift and
 // mac/AppMenu.swift: a transparent, click-through floating window reports the pointer to the page,
 // forwards global keyboard and mouse input, and offers the same tray menu. The page is drawn by
-// the system WebView2, so the app ships no browser of its own. tauri-plugin-updater handles updates.
+// the system WebView2, so the app ships no browser of its own. Updates are installed by hand from the
+// release page: no updater plugin, no signing key.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod autostart;
@@ -30,7 +31,6 @@ use tauri::{
     AppHandle, LogicalSize, Manager, PhysicalPosition, RunEvent, Webview, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, Wry,
 };
-use tauri_plugin_updater::{Update, UpdaterExt};
 
 use hook::{Button, Input};
 use store::Store;
@@ -54,16 +54,6 @@ const BRIDGE: &str = r#"(() => {
 
 // MARK: State
 
-#[derive(Clone, PartialEq)]
-enum UpdateState {
-    Idle,
-    Checking,
-    Downloading(String, u32),
-    Ready(String),
-    Current,
-    Failed,
-}
-
 struct Drag {
     cursor: (f64, f64),
     origin: (i32, i32),
@@ -81,8 +71,6 @@ struct Host {
     last_cursor: (i32, i32),
     key_events: u64,
     held: HashSet<u32>,
-    update: UpdateState,
-    downloaded: Option<(Update, Vec<u8>)>,
 }
 
 /// Settings with their defaults applied, the same keys and fallbacks as the mac build.
@@ -575,21 +563,6 @@ fn toggle(app: &AppHandle, text: &str, key: &str, on: bool) -> tauri::Result<Ite
     check(app, format!("set:{key}={}", !on), text, on)
 }
 
-fn update_item(app: &AppHandle) -> tauri::Result<Item> {
-    let version = app.package_info().version.to_string();
-    if DEV {
-        return note(app, &format!("开发模式 v{version}"));
-    }
-    match host(app).update.clone() {
-        UpdateState::Ready(new) => action(app, "update:install", &format!("重启并更新到 v{new}")),
-        UpdateState::Downloading(_, percent) => note(app, &format!("正在下载更新 {percent}%")),
-        UpdateState::Checking => note(app, "正在检查更新…"),
-        UpdateState::Current => note(app, &format!("已是最新版本 v{version}")),
-        UpdateState::Failed => action(app, "update:check", "检查更新失败，点击重试"),
-        UpdateState::Idle => action(app, "update:check", "检查更新…"),
-    }
-}
-
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let (s, hook_ready) = {
         let h = host(app);
@@ -671,7 +644,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let visible = panel(app).and_then(|panel| panel.is_visible().ok()).unwrap_or(false);
     items.push(action(app, "visibility", if visible { "隐藏" } else { "显示" })?);
     items.push(separator(app)?);
-    items.push(update_item(app)?);
+    items.push(note(app, &format!("KeyCat v{}", app.package_info().version))?);
     if !DEV && !hook_ready {
         items.push(note(app, "键盘监听未启动（详见 log.txt）")?);
     }
@@ -689,12 +662,6 @@ fn rebuild_menu(app: &AppHandle) {
         }
         Err(error) => log(&format!("menu build failed: {error}")),
     }
-}
-
-/// Rebuilds the tray menu from any thread.
-fn refresh_menu(app: &AppHandle) {
-    let app2 = app.clone();
-    let _ = app.run_on_main_thread(move || rebuild_menu(&app2));
 }
 
 fn show_context_menu(app: &AppHandle, panel: &WebviewWindow) {
@@ -737,8 +704,6 @@ fn on_menu(app: &AppHandle, id: &str) {
                     let _ = if panel.is_visible().unwrap_or(false) { panel.hide() } else { panel.show() };
                 }
             }
-            "update:check" => check_for_updates(app),
-            "update:install" => install_update(app),
             "quit" => app.exit(0),
             _ => {}
         }
@@ -814,99 +779,6 @@ fn write_status(app: &AppHandle, ticks: f64) {
     let _ = fs::write(data_dir().join("status.txt"), line);
 }
 
-fn set_update(app: &AppHandle, state: UpdateState) {
-    let changed = {
-        let mut h = host(app);
-        let changed = h.update != state;
-        h.update = state;
-        changed
-    };
-    if changed {
-        refresh_menu(app);
-    }
-}
-
-fn check_for_updates(app: &AppHandle) {
-    if DEV {
-        return;
-    }
-    {
-        let mut h = host(app);
-        if matches!(h.update, UpdateState::Checking | UpdateState::Downloading(..) | UpdateState::Ready(_)) {
-            return;
-        }
-        h.update = UpdateState::Checking;
-    }
-    refresh_menu(app);
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let found = match app.updater() {
-            Ok(updater) => updater.check().await,
-            Err(error) => Err(error),
-        };
-        let update = match found {
-            Ok(Some(update)) => update,
-            Ok(None) => return set_update(&app, UpdateState::Current),
-            Err(error) => {
-                log(&format!("update check failed: {error}"));
-                return set_update(&app, UpdateState::Failed);
-            }
-        };
-        let version = update.version.clone();
-        log(&format!("update {version} available"));
-        set_update(&app, UpdateState::Downloading(version.clone(), 0));
-        let (progress_app, progress_version) = (app.clone(), version.clone());
-        let mut received = 0u64;
-        let downloaded = update
-            .download(
-                move |chunk, total| {
-                    received += chunk as u64;
-                    if let Some(total) = total.filter(|total| *total > 0) {
-                        let percent = (received * 100 / total).min(100) as u32;
-                        set_update(&progress_app, UpdateState::Downloading(progress_version.clone(), percent));
-                    }
-                },
-                || {},
-            )
-            .await;
-        match downloaded {
-            Ok(bytes) => {
-                log(&format!("update {version} downloaded"));
-                host(&app).downloaded = Some((update, bytes));
-                set_update(&app, UpdateState::Ready(version.clone()));
-                if let Some(tray) = app.tray_by_id(TRAY) {
-                    let _ = tray.set_tooltip(Some(format!("KeyCat：v{version} 已下载，可从菜单重启更新")));
-                }
-            }
-            Err(error) => {
-                log(&format!("update download failed: {error}"));
-                set_update(&app, UpdateState::Failed);
-            }
-        }
-    });
-}
-
-/// Runs the downloaded installer, which closes this process and starts the new version.
-fn install_update(app: &AppHandle) {
-    let Some((update, bytes)) = host(app).downloaded.take() else { return };
-    log(&format!("installing update {}", update.version));
-    if let Err(error) = update.install(bytes) {
-        log(&format!("update install failed: {error}"));
-        set_update(app, UpdateState::Failed);
-    }
-}
-
-fn start_update_checks(app: &AppHandle) {
-    let app = app.clone();
-    thread::spawn(move || {
-        thread::sleep(Duration::from_secs(15));
-        loop {
-            check_for_updates(&app);
-            thread::sleep(Duration::from_secs(6 * 60 * 60));
-        }
-    });
-}
-
 // MARK: Lifecycle
 
 fn setup(app: &AppHandle) -> tauri::Result<()> {
@@ -923,8 +795,6 @@ fn setup(app: &AppHandle) -> tauri::Result<()> {
         last_cursor: (-9999, -9999),
         key_events: 0,
         held: HashSet::new(),
-        update: UpdateState::Idle,
-        downloaded: None,
     }));
     create_panel(app)?;
     TrayIconBuilder::with_id(TRAY)
@@ -935,7 +805,6 @@ fn setup(app: &AppHandle) -> tauri::Result<()> {
     start_pump(app);
     // Built after the hook came up, so a failed hook shows in the menu.
     rebuild_menu(app);
-    start_update_checks(app);
     log(&format!("started v{}", app.package_info().version));
     Ok(())
 }
@@ -947,7 +816,6 @@ fn main() {
                 let _ = panel.show();
             }
         }))
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![host_message])
         .on_menu_event(|app, event| on_menu(app, event.id().as_ref()))
         .setup(|app| Ok(setup(app.handle())?))
