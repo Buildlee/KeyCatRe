@@ -24,6 +24,7 @@ curl -L -o /tmp/KeyCat-macOS.zip https://github.com/ElloboDK/KeyCat/releases/lat
 ## 构建
 
 ```sh
+npm install && npm run build:web   # → web/dist（裁剪后的 three.min.js + 压缩后的 app.bundle.min.js）
 sh mac/build.sh       # → build/KeyCat.app（通用二进制，需 Xcode 命令行工具）
 sh mac/package.sh     # → dist/KeyCat-macOS.zip + .sha256
 

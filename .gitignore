@@ -1,6 +1,6 @@
 # Build output and release artifacts
 build/
-dist/
+/dist/
 
 # Local code-signing identity: private key plus its password. Never commit.
 signing/
@@ -16,3 +16,6 @@ win/node_modules/
 win/target/
 win/gen/
 win/out/
+
+# Web build deps (web/dist itself is committed: tauri/CI build without running npm)
+node_modules/
