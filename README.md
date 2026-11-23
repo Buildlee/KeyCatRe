@@ -6,13 +6,15 @@
 
 ## 下载
 
-**Windows**：[下载 KeyCat-Windows-Setup.exe](https://github.com/Buildlee/KeyCatRe/releases/latest/download/KeyCat-Windows-Setup.exe)
+**[Windows 版 KeyCat-Windows-Setup.exe](https://github.com/Buildlee/KeyCatRe/releases/latest/download/KeyCat-Windows-Setup.exe)** — 1.25 MB，Windows 10+
 
-双击安装就能用，不需要额外装运行时（界面由系统自带的 WebView2 绘制），装完在托盘里出现一只猫。装好会注册卸载项，卸载走安装目录里的 `uninstall.exe`，或者「设置 → 应用」。
+双击安装就能用，不需要另装运行时（界面由系统自带的 WebView2 绘制），装完在托盘里出现一只猫。默认装到 `D:\Program\KeyCat`，没有 D 盘时退到 `%LOCALAPPDATA%\KeyCat`，安装向导里可以改；卸载走安装目录里的 `uninstall.exe`。
 
-## 安装
+SmartScreen 拦截时点「更多信息 → 仍要运行」（安装包没有数字签名）。应用不会自动更新：有新版本时回这一页下载覆盖安装，设置会保留。
 
-**macOS**：在终端执行
+## macOS
+
+在终端执行
 
 ```sh
 curl -L -o /tmp/KeyCat-macOS.zip https://github.com/ElloboDK/KeyCat/releases/latest/download/KeyCat-macOS.zip \
@@ -20,8 +22,6 @@ curl -L -o /tmp/KeyCat-macOS.zip https://github.com/ElloboDK/KeyCat/releases/lat
 ```
 
 首次启动需在「系统设置 → 隐私与安全性 → 输入监控」里允许 KeyCat，然后重启应用。它只读取哪个键被按下，不记录输入内容。手动从浏览器下载时，若提示「已损坏」，执行 `xattr -dr com.apple.quarantine /Applications/KeyCat.app`。
-
-**Windows**：从 [Releases](https://github.com/Buildlee/KeyCatRe/releases/latest) 下载 `KeyCat-Windows-Setup.exe` 运行。SmartScreen 拦截时点「更多信息 → 仍要运行」。安装包只有几 MB，猫由系统自带的 WebView2 绘制，极少数没装 WebView2 的 Win10 会在安装时自动下载。默认装到 `D:\Program\KeyCat`，没有 D 盘时退到 `%LOCALAPPDATA%\KeyCat`，安装向导里也能自己改目录。应用不会自动更新：有新版本时到 Releases 页手动下载安装即可，设置会保留。
 
 ## 使用
 
